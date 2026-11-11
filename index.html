@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reporte de Cierre Operativo — TECSYCOM / WIN</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23FF5A0A'/%3E%3Cpath d='M6 17V10M12 17V7M18 17v-4' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<!-- Librerías Externas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --brand-orange: #FF5A0A;
+    --brand-orange-hover: #E04E07;
+    --brand-orange-soft: rgba(255, 90, 10, 0.08);
+    --brand-orange-glow: rgba(255, 90, 10, 0.15);
+    
+    --bg: #F8FAFC;
+    --panel: #FFFFFF;
+    --panel-hover: #F1F5F9;
+    --panel-2: #F8FAFC;
+    --line: #E2E8F0;
+    --line-subtle: #F1F5F9;
+    
+    --text: #0F172A;
+    --text-muted: #64748B;
+    --text-dim: #94A3B8;
+    
+    --amber: #D97706;
+    --amber-soft: rgba(217, 119, 6, 0.1);
+    --red: #E11D48;
+    --red-soft: rgba(225, 29, 72, 0.1);
+    --green: #16A34A;
+    --green-soft: rgba(22, 163, 74, 0.1);
+    --blue: #2563EB;
+    --blue-soft: rgba(37, 99, 235, 0.1);
+    
+    --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .wrap {
+    max-width: 1900px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 32px;
+    flex: 1;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: var(--panel);
+    padding: 20px 28px;
+    border-radius: 16px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--line);
+    margin-bottom: 24px;
+  }
+
+  .brand-block { display: flex; align-items: center; gap: 16px; }
+
+  .brand-logo {
+    width: 46px; height: 46px;
+    background: var(--brand-orange);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px var(--brand-orange-glow);
+    flex-shrink: 0;
+  }
+
+  .brand-logo svg { width: 26px; height: 26px; fill: none; stroke: #FFF; stroke-width: 2.2; stroke-linecap: round; }
+
+  .brand-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: .05em;
+    color: var(--brand-orange);
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 2px;
+    font-weight: 700;
+  }
+
+  .brand-eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-orange); }
+
+  h1 { font-size: 24px; font-weight: 800; margin: 0; letter-spacing: -0.3px; color: var(--text); }
+  .subtitle { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+  .loader-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+  .btn {
+    background: var(--brand-orange);
+    color: #FFFFFF;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .2s ease;
+    display: inline-flex; align-items: center; gap: 6px;
+    box-shadow: 0 4px 12px var(--brand-orange-glow);
+  }
+
+  .btn:hover { background: var(--brand-orange-hover); }
+
+  .btn.secondary {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    box-shadow: none;
+  }
+
+  .btn.secondary:hover { background: var(--panel-hover); border-color: var(--line); }
+
+  input[type=file] { display: none; }
+
+  .filters {
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 24px; background: var(--panel); padding: 14px 20px;
+    border-radius: 12px; border: 1px solid var(--line); box-shadow: var(--shadow-sm);
+  }
+
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  .filter-group label { font-size: 12px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+
+  select, input[type=text] {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s ease;
+  }
+
+  select:focus, input[type=text]:focus { border-color: var(--brand-orange); background: var(--panel); }
+
+  .kpis {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 24px;
+  }
+
+  .kpi {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 16px;
+    position: relative; overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .kpi .label { font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 8px; }
+  .kpi .value { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 800; color: var(--text); line-height: 1; }
+
+  .kpi .sub-pill {
+    display: inline-block; font-size: 11px; font-weight: 700; margin-top: 10px; padding: 3px 8px;
+    border-radius: 20px; background: var(--accent-soft, var(--panel-2)); color: var(--accent, var(--text-muted));
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .chart-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .chart-card h2 { font-size: 17px; font-weight: 800; margin: 0 0 4px; }
+  .chart-card .sub { font-size: 13px; color: var(--text-muted); margin-bottom: 18px; }
+  .chart-container { position: relative; height: 340px; width: 100%; }
+
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+  @media(max-width: 1400px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+  @media(max-width: 1024px) { .panels { grid-template-columns: 1fr; } }
+  @media(max-width: 600px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .panel h2 { font-size: 18px; font-weight: 800; margin: 0 0 4px; }
+  .panel .panel-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+
+  .table-scroll { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+
+  thead th {
+    color: var(--text-muted); font-weight: 700; font-size: 11px; padding: 10px 8px;
+    border-bottom: 1px solid var(--line); background: var(--panel-2); cursor: pointer;
+    white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; user-select: none;
+  }
+
+  thead th:hover { color: var(--brand-orange); }
+
+  tbody td {
+    padding: 10px 8px; border-bottom: 1px solid var(--line-subtle);
+    font-family: 'JetBrains Mono', monospace; white-space: nowrap; color: var(--text);
+  }
+
+  tbody tr:hover td { background: var(--panel-hover); }
+
+  tbody td:first-child {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-weight: 700;
+    max-width: 160px; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  tbody tr.total-row td {
+    font-weight: 800; border-top: 2px solid var(--line); background: var(--panel-2);
+  }
+
+  .pill {
+    padding: 3px 8px; border-radius: 20px; font-size: 10.5px; font-weight: 700;
+    display: inline-block; font-family: 'JetBrains Mono', monospace;
+  }
+
+  .pill.ok { background: var(--green-soft); color: var(--green); border: 1px solid rgba(22, 163, 74, 0.2); }
+  .pill.bad { background: var(--red-soft); color: var(--red); border: 1px solid rgba(225, 29, 72, 0.2); }
+
+  .empty {
+    border: 2px dashed var(--line); padding: 60px 30px; text-align: center;
+    color: var(--text-muted); background: var(--panel); border-radius: 14px; box-shadow: var(--shadow-sm);
+  }
+
+  .empty .big { font-size: 18px; color: var(--text); margin-bottom: 8px; font-weight: 700; }
+
+  footer {
+    padding: 24px 32px; color: var(--text-muted); font-size: 12.5px;
+    border-top: 1px solid var(--line); background: var(--panel); margin-top: auto;
+  }
+
+  footer code { font-family: 'JetBrains Mono', monospace; color: var(--brand-orange); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="brand-block">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24"><path d="M6 17V10M12 17V7M18 17v-4"/></svg>
+      </div>
+      <div>
+        <div class="brand-eyebrow"><span class="dot"></span>TECSYCOM · WIN</div>
+        <h1>Reporte de Cierre Operativo</h1>
+        <div class="subtitle">Efectividad diaria, resumen por distrito y cuadrilla de técnicos.</div>
+      </div>
+    </div>
+
+    <div class="loader-actions">
+      <button class="btn" id="btnChoose">📁 Cargar Archivo Diario</button>
+      <button class="btn secondary" id="btnRefresh">🔄 Refrescar desde la Hoja "BASE"</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    </div>
+  </header>
+
+  <div class="filters" id="filtersBar" style="display:none;">
+    <div class="filter-group">
+      <label for="fBuscar">Buscar</label>
+      <input type="text" id="fBuscar" placeholder="distrito o cuadrilla…">
+    </div>
+    <button class="btn secondary" id="btnReset">Limpiar Filtros</button>
+    <button class="btn" id="btnExport" style="margin-left:auto;">📥 Exportar a Excel</button>
+  </div>
+
+  <div id="kpiSection"></div>
+
+  <div id="chartSection" style="display:none;" class="chart-card">
+    <h2>Evolución Diaria por Fecha de Solicitud (F.Soli)</h2>
+    <div class="sub">Columna: Cantidad Asignados · Líneas: Cantidad Finalizados y % Efectividad</div>
+    <div class="chart-container">
+      <canvas id="comboChart"></canvas>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="empty">
+      <div class="big">Cargando datos desde la hoja "BASE" de Google Sheets…</div>
+      Por favor espere un momento.
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Conectado a Google Sheets en la hoja <code>BASE</code> · <code>Distrito</code> de "(" a "," · <code>REPROGRAMA</code> = Estado cancelado + Motivo con "REPROGRAMACIÓN".
+</footer>
+
+<script>
+(function(){
+  const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzcbACMQ3MJ6xOBVoh-e0TTHGTwXUYrnkcoA66e8KP9jgk2eCIBma9GizCF2EivcbJ02w/exec";
+  const OBJETIVO = 0.55;
+  let rawRows = [];
+  let sortState = { zona: {key:'efectividad', dir:-1}, tecnico: {key:'efectividad', dir:-1} };
+  let comboChartInstance = null;
+
+  const fileInput = document.getElementById('fileInput');
+  document.getElementById('btnChoose').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); e.target.value = ''; });
+  document.getElementById('btnRefresh').addEventListener('click', fetchFromGoogleSheets);
+
+  // Al cargar la página, leer automáticamente desde la hoja "BASE" de Google Sheets
+  window.addEventListener('DOMContentLoaded', fetchFromGoogleSheets);
+
+  function formatExcelDate(rawVal) {
+    if (rawVal === undefined || rawVal === null || rawVal === '') return 'SIN FECHA';
+    let strVal = String(rawVal).trim();
+    if (!isNaN(strVal) && strVal.length >= 4 && !strVal.includes('/')) {
+      let numDays = parseFloat(strVal);
+      let dateObj = new Date(Math.round((numDays - 25569) * 86400 * 1000));
+      if (!isNaN(dateObj.getTime())) {
+        let day = String(dateObj.getUTCDate()).padStart(2, '0');
+        let month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+        let year = dateObj.getUTCFullYear();
+        return `${day}/${month}/${year}`;
+      }
+    }
+    return strVal.split(' ')[0];
+  }
+
+  function handleFile(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rawAoA = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        
+        let headerRowIndex = -1;
+        for (let i = 0; i < rawAoA.length; i++) {
+          if (rawAoA[i].some(cell => String(cell).trim() === 'OrdenId')) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        if (headerRowIndex === -1) throw new Error('No se encontró la columna de encabezado "OrdenId" en el archivo.');
+
+        const headers = rawAoA[headerRowIndex].map(h => String(h).trim());
+        const json = [];
+        for (let i = headerRowIndex + 1; i < rawAoA.length; i++) {
+          const row = rawAoA[i];
+          if (row.some(cell => cell !== '')) {
+            let obj = {};
+            headers.forEach((h, colIdx) => {
+              if (h) obj[h] = row[colIdx] !== undefined ? row[colIdx] : '';
+            });
+            json.push(obj);
+          }
+        }
+        
+        rawRows = parseRows(json);
+        document.getElementById('filtersBar').style.display = 'flex';
+        document.getElementById('chartSection').style.display = 'block';
+        render();
+
+        // 💾 Guardar automáticamente en Google Sheets (Hoja "BASE")
+        saveToGoogleSheets(json);
+      } catch(err) {
+        alert('Error al leer el archivo: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function parseRows(json){
+    return json.map(r => {
+      let direccion = String(r['Direccion'] || '');
+      let distrito = 'DESCONOCIDO';
+      if (direccion.includes('(') && direccion.includes(',')) {
+        try { distrito = direccion.split('(')[1].split(',')[0].trim(); } catch(e){}
+      }
+
+      let fecha = formatExcelDate(r['F.Soli']);
+      let estadoRaw = String(r['Estado'] || '').trim();
+      let motivoCanc = String(r['Motivo Cancelación'] || '').toUpperCase();
+      let estado = estadoRaw.toUpperCase();
+
+      if ((estado === 'CANCELADA' || estado === 'CANCELADO') && (motivoCanc.includes('REPROGRAMACIÓN') || motivoCanc.includes('REPROGRAMACION'))) {
+        estado = 'REPROGRAMA';
+      }
+
+      let tecnico = String(r['Cuadrilla'] || 'SIN ASIGNAR').trim();
+      return { distrito, fecha, estado, tecnico };
+    }).filter(r => r.distrito || r.tecnico);
+  }
+
+  function fetchFromGoogleSheets(){
+    document.getElementById('content').innerHTML = '<div class="empty"><div class="big">Cargando datos desde la hoja "BASE"…</div></div>';
+    fetch(WEBHOOK_URL + "?action=get", { method: 'GET' })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          rawRows = parseRows(data);
+          document.getElementById('filtersBar').style.display = 'flex';
+          document.getElementById('chartSection').style.display = 'block';
+          render();
+        } else {
+          document.getElementById('content').innerHTML = '<div class="empty"><div class="big">No hay registros en la hoja "BASE"</div>Carga un archivo Excel diario para poblar la información.</div>';
+        }
+      })
+      .catch(err => {
+        console.warn('Aviso de carga remota:', err);
+      });
+  }
+
+  function saveToGoogleSheets(jsonData){
+    fetch(WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sheet: "BASE", rows: jsonData })
+    }).then(() => {
+      console.log('Información guardada con éxito en la hoja "BASE" de Google Sheets.');
+    }).catch(err => console.error('Error al guardar en Sheets:', err));
+  }
+
+  document.getElementById('fBuscar').addEventListener('input', render);
+  document.getElementById('btnReset').addEventListener('click', () => {
+    document.getElementById('fBuscar').value = '';
+    render();
+  });
+
+  function aggregate(rows, keyFn){
+    const map = new Map();
+    rows.forEach(r => {
+      const key = keyFn(r);
+      if (!key) return;
+      if (!map.has(key)) map.set(key, {key, asignados:0, finalizado:0, cancelado:0, reprograma:0, otros:0});
+      const g = map.get(key);
+      g.asignados++;
+      if (r.estado === 'FINALIZADA' || r.estado === 'FINALIZADO') g.finalizado++;
+      else if (r.estado === 'CANCELADA' || r.estado === 'CANCELADO') g.cancelado++;
+      else if (r.estado === 'REPROGRAMA') g.reprograma++;
+      else g.otros++;
+    });
+    return [...map.values()].map(g => {
+      const pendiente = g.asignados - g.finalizado - g.cancelado - g.reprograma;
+      const efectividad = g.asignados ? g.finalizado / g.asignados : 0;
+      return {...g, pendiente, efectividad};
+    });
+  }
+
+  function totals(list){
+    const t = {asignados:0, finalizado:0, cancelado:0, reprograma:0, otros:0, pendiente:0};
+    list.forEach(g => {
+      t.asignados += g.asignados;
+      t.finalizado += g.finalizado;
+      t.cancelado += g.cancelado;
+      t.reprograma += g.reprograma;
+      t.otros += g.otros;
+      t.pendiente += g.pendiente;
+    });
+    t.efectividad = t.asignados ? t.finalizado / t.asignados : 0;
+    return t;
+  }
+
+  function pct(x){ return (x * 100).toFixed(1) + '%'; }
+
+  function render(){
+    if (!rawRows.length) return;
+    const search = document.getElementById('fBuscar').value.trim().toLowerCase();
+
+    let zonaList = aggregate(rawRows, r => r.distrito);
+    let tecList = aggregate(rawRows, r => r.tecnico);
+    let fechaList = aggregate(rawRows, r => r.fecha);
+
+    if (search){
+      zonaList = zonaList.filter(g => g.key.toLowerCase().includes(search));
+      tecList = tecList.filter(g => g.key.toLowerCase().includes(search));
+    }
+
+    const globalTotals = totals(aggregate(rawRows, r => 'ALL'));
+    renderKpis(globalTotals);
+    renderChart(fechaList);
+    renderTable('zona', 'Resumen por Distrito (Zona)', zonaList);
+    renderTable('tecnico', 'Resumen por Cuadrilla (Técnico)', tecList);
+  }
+
+  function renderKpis(t){
+    const cards = [
+      {label:'Total Asignados', value: String(t.asignados), subPill:'100% Total', accent:'var(--text)', accentSoft:'var(--panel-2)'},
+      {label:'Finalizados', value: String(t.finalizado), subPill: pct(t.efectividad) + ' Efec.', accent:'var(--green)', accentSoft:'var(--green-soft)'},
+      {label:'Reprogramados', value: String(t.reprograma), subPill: pct(t.reprograma/(t.asignados||1)) + ' Reprog.', accent:'var(--amber)', accentSoft:'var(--amber-soft)'},
+      {label:'Cancelados', value: String(t.cancelado), subPill: pct(t.cancelado/(t.asignados||1)) + ' Canc.', accent:'var(--red)', accentSoft:'var(--red-soft)'},
+      {label:'Pendientes', value: String(t.pendiente), subPill: 'En Curso', accent:'var(--blue)', accentSoft:'var(--blue-soft)'},
+      {label:'Efectividad Global', value: pct(t.efectividad), subPill: t.efectividad>=OBJETIVO?'Cumple Meta':'Bajo Meta', accent:'var(--brand-orange)', accentSoft:'var(--brand-orange-soft)'}
+    ];
+
+    document.getElementById('kpiSection').innerHTML = `<div class="kpis">${
+      cards.map(c => `
+        <div class="kpi" style="--accent:${c.accent};--accent-soft:${c.accentSoft}">
+          <div class="label">${c.label}</div>
+          <div class="value">${c.value}</div>
+          <div class="sub-pill">${c.subPill}</div>
+        </div>`).join('')
+    }</div>`;
+  }
+
+  function renderChart(fechaList){
+    const sortedDates = [...fechaList].sort((a,b) => a.key.localeCompare(b.key));
+    const labels = sortedDates.map(d => d.key);
+    const dataAsig = sortedDates.map(d => d.asignados);
+    const dataFin = sortedDates.map(d => d.finalizado);
+    const dataEfec = sortedDates.map(d => +(d.efectividad * 100).toFixed(1));
+
+    const ctx = document.getElementById('comboChart').getContext('2d');
+    if (comboChartInstance) comboChartInstance.destroy();
+
+    comboChartInstance = new Chart(ctx, {
+      data: {
+        labels: labels,
+        datasets: [
+          { 
+            type: 'bar', 
+            label: 'Asignados', 
+            data: dataAsig, 
+            yAxisID: 'yCant', 
+            backgroundColor: '#CBD5E1', 
+            borderRadius: 6,
+            order: 2
+          },
+          { 
+            type: 'line', 
+            label: 'Finalizados', 
+            data: dataFin, 
+            yAxisID: 'yCant', 
+            borderColor: '#16A34A', 
+            backgroundColor: '#16A34A', 
+            borderWidth: 3, 
+            pointRadius: 5, 
+            fill: false,
+            order: 1
+          },
+          { 
+            type: 'line', 
+            label: '% Efectividad', 
+            data: dataEfec, 
+            yAxisID: 'yEfec', 
+            borderColor: '#FF5A0A', 
+            backgroundColor: '#FF5A0A', 
+            borderWidth: 3, 
+            pointRadius: 5, 
+            fill: false,
+            order: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          yCant: { type: 'linear', position: 'left', title: { display: true, text: 'Cantidad de OTs' }, beginAtZero: true },
+          yEfec: { type: 'linear', position: 'right', min: 0, max: 100, title: { display: true, text: '% Efectividad' }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  }
+
+  function renderTable(id, title, list){
+    const content = document.getElementById('content');
+    if (!document.getElementById('panel-' + id)) {
+      if (id === 'zona') content.innerHTML = '<div class="panels"><div id="panel-zona" class="panel"></div><div id="panel-tecnico" class="panel"></div></div>';
+    }
+    const panel = document.getElementById('panel-' + id);
+    const state = sortState[id];
+    const sorted = [...list].sort((a,b) => (a[state.key] > b[state.key] ? 1 : -1) * state.dir);
+    const t = totals(list);
+
+    panel.innerHTML = `
+      <h2>${title}</h2>
+      <div class="panel-sub">${list.length} registros en total</div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th data-key="key">${id === 'zona' ? 'DISTRITO' : 'CUADRILLA / TÉCNICO'}</th>
+              <th data-key="asignados">ASIG.</th>
+              <th data-key="finalizado">FINAL.</th>
+              <th data-key="reprograma">REPROG.</th>
+              <th data-key="cancelado">CANC.</th>
+              <th data-key="pendiente">PEND.</th>
+              <th data-key="efectividad">EFECT.</th>
+              <th>ESTADO</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(g => `
+              <tr>
+                <td title="${g.key}">${g.key}</td>
+                <td>${g.asignados}</td>
+                <td>${g.finalizado}</td>
+                <td>${g.reprograma}</td>
+                <td>${g.cancelado}</td>
+                <td>${g.pendiente}</td>
+                <td>${pct(g.efectividad)}</td>
+                <td>${g.efectividad >= OBJETIVO ? '<span class="pill ok">OK</span>' : `<span class="pill bad">Falta ${Math.ceil(g.asignados*OBJETIVO)-g.finalizado}</span>`}</td>
+              </tr>`).join('')}
+            <tr class="total-row">
+              <td>TOTAL</td>
+              <td>${t.asignados}</td>
+              <td>${t.finalizado}</td>
+              <td>${t.reprograma}</td>
+              <td>${t.cancelado}</td>
+              <td>${t.pendiente}</td>
+              <td>${pct(t.efectividad)}</td>
+              <td>${t.efectividad >= OBJETIVO ? '<span class="pill ok">OK</span>' : '<span class="pill bad">BAJO META</span>'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    panel.querySelectorAll('thead th[data-key]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.key;
+        if (state.key === key) state.dir *= -1; else { state.key = key; state.dir = 1; }
+        renderTable(id, title, list);
+      });
+    });
+  }
+
+  document.getElementById('btnExport').addEventListener('click', () => {
+    if (!rawRows.length) return;
+    const wb = XLSX.utils.book_new();
+    const zonaList = aggregate(rawRows, r => r.distrito);
+    const tecList = aggregate(rawRows, r => r.tecnico);
+
+    const formatData = list => list.map(g => ({
+      Nombre: g.key, Asignados: g.asignados, Finalizados: g.finalizado,
+      Reprogramados: g.reprograma, Cancelados: g.cancelado, Pendientes: g.pendiente,
+      Efectividad: (g.efectividad*100).toFixed(1) + '%'
+    }));
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(formatData(zonaList)), 'POR_DISTRITO');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(formatData(tecList)), 'POR_CUADRILLA');
+    XLSX.writeFile(wb, `Reporte_TECSYCOM_WIN_${new Date().toISOString().slice(0,10)}.xlsx`);
+  });
+
+})();
+</script>
+
+</body>
+</html>
