@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reporte de Cierre Operativo — TECSYCOM / WIN</title>
+<title>TECSYCOM / WIN</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23FF5A0A'/%3E%3Cpath d='M6 17V10M12 17V7M18 17v-4' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
 
 <!-- Librerías Externas -->
@@ -274,14 +274,14 @@
       </div>
       <div>
         <div class="brand-eyebrow"><span class="dot"></span>TECSYCOM · WIN</div>
-        <h1>Reporte de Cierre Operativo</h1>
+        <h1>Reporte de Cierre diario</h1>
         <div class="subtitle">Efectividad diaria, resumen por distrito y cuadrilla de técnicos. Meta del 60%.</div>
       </div>
     </div>
 
     <div class="loader-actions">
       <button class="btn" id="btnChoose">📁 Cargar Archivo Diario</button>
-      <button class="btn secondary" id="btnRefresh">🔄 Actualizar desde Google Sheets</button>
+      <button class="btn secondary" id="btnRefresh">🔄 Actualizar</button>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
     </div>
   </header>
@@ -305,7 +305,7 @@
   <div id="kpiSection"></div>
 
   <div id="chartSection" style="display:none;" class="chart-card">
-    <h2>Evolución Diaria por Fecha de Solicitud (F.Soli)</h2>
+    <h2>Evolución Diaria por Fecha</h2>
     <div class="sub">Columna: Asignados · Línea y puntos resaltados en color corporativo (#FF5A0A) solo para los días que alcanzaron o superaron la meta del 60%</div>
     <div class="chart-container">
       <canvas id="comboChart"></canvas>
