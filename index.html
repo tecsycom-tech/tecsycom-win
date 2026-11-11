@@ -9,6 +9,7 @@
 <!-- Librerías Externas -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -192,7 +193,7 @@
 
   .chart-card h2 { font-size: 17px; font-weight: 800; margin: 0 0 4px; }
   .chart-card .sub { font-size: 13px; color: var(--text-muted); margin-bottom: 18px; }
-  .chart-container { position: relative; height: 340px; width: 100%; }
+  .chart-container { position: relative; height: 400px; width: 100%; }
 
   .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 
@@ -274,18 +275,26 @@
       <div>
         <div class="brand-eyebrow"><span class="dot"></span>TECSYCOM · WIN</div>
         <h1>Reporte de Cierre Operativo</h1>
-        <div class="subtitle">Efectividad diaria, resumen por distrito y cuadrilla de técnicos.</div>
+        <div class="subtitle">Efectividad diaria, resumen por distrito y cuadrilla de técnicos. Meta del 60%.</div>
       </div>
     </div>
 
     <div class="loader-actions">
       <button class="btn" id="btnChoose">📁 Cargar Archivo Diario</button>
-      <button class="btn secondary" id="btnRefresh">🔄 Refrescar desde la Hoja "BASE"</button>
+      <button class="btn secondary" id="btnRefresh">🔄 Actualizar desde Google Sheets</button>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
     </div>
   </header>
 
   <div class="filters" id="filtersBar" style="display:none;">
+    <!-- Nuevo Filtro por Fecha -->
+    <div class="filter-group">
+      <label for="fFecha">Fecha Solicitud</label>
+      <select id="fFecha">
+        <option value="">Todas las Fechas</option>
+      </select>
+    </div>
+
     <div class="filter-group">
       <label for="fBuscar">Buscar</label>
       <input type="text" id="fBuscar" placeholder="distrito o cuadrilla…">
@@ -298,7 +307,7 @@
 
   <div id="chartSection" style="display:none;" class="chart-card">
     <h2>Evolución Diaria por Fecha de Solicitud (F.Soli)</h2>
-    <div class="sub">Columna: Cantidad Asignados · Líneas: Cantidad Finalizados y % Efectividad</div>
+    <div class="sub">Columna: Asignados (con valor visible) · Línea: Finalizadas y % Efectividad (con tamaño visible destacado)</div>
     <div class="chart-container">
       <canvas id="comboChart"></canvas>
     </div>
@@ -314,13 +323,13 @@
 </div>
 
 <footer>
-  Conectado a Google Sheets en la hoja <code>BASE</code> · <code>Distrito</code> de "(" a "," · <code>REPROGRAMA</code> = Estado cancelado + Motivo con "REPROGRAMACIÓN".
+  Sincronización automática activa con Google Sheets (Hoja <code>BASE</code>) · Filtro de fecha activado.
 </footer>
 
 <script>
 (function(){
   const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzcbACMQ3MJ6xOBVoh-e0TTHGTwXUYrnkcoA66e8KP9jgk2eCIBma9GizCF2EivcbJ02w/exec";
-  const OBJETIVO = 0.55;
+  const OBJETIVO = 0.60;
   let rawRows = [];
   let sortState = { zona: {key:'efectividad', dir:-1}, tecnico: {key:'efectividad', dir:-1} };
   let comboChartInstance = null;
@@ -330,12 +339,22 @@
   fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); e.target.value = ''; });
   document.getElementById('btnRefresh').addEventListener('click', fetchFromGoogleSheets);
 
-  // Al cargar la página, leer automáticamente desde la hoja "BASE" de Google Sheets
   window.addEventListener('DOMContentLoaded', fetchFromGoogleSheets);
 
   function formatExcelDate(rawVal) {
     if (rawVal === undefined || rawVal === null || rawVal === '') return 'SIN FECHA';
     let strVal = String(rawVal).trim();
+
+    if (strVal.includes('T') && (strVal.endsWith('Z') || strVal.includes('+'))) {
+      let dObj = new Date(strVal);
+      if (!isNaN(dObj.getTime())) {
+        let day = String(dObj.getUTCDate()).padStart(2, '0');
+        let month = String(dObj.getUTCMonth() + 1).padStart(2, '0');
+        let year = dObj.getUTCFullYear();
+        return `${day}/${month}/${year}`;
+      }
+    }
+
     if (!isNaN(strVal) && strVal.length >= 4 && !strVal.includes('/')) {
       let numDays = parseFloat(strVal);
       let dateObj = new Date(Math.round((numDays - 25569) * 86400 * 1000));
@@ -346,7 +365,8 @@
         return `${day}/${month}/${year}`;
       }
     }
-    return strVal.split(' ')[0];
+
+    return strVal.split(' ')[0].split('T')[0];
   }
 
   function handleFile(file){
@@ -382,11 +402,11 @@
         }
         
         rawRows = parseRows(json);
+        populateDateSelect();
         document.getElementById('filtersBar').style.display = 'flex';
         document.getElementById('chartSection').style.display = 'block';
         render();
 
-        // 💾 Guardar automáticamente en Google Sheets (Hoja "BASE")
         saveToGoogleSheets(json);
       } catch(err) {
         alert('Error al leer el archivo: ' + err.message);
@@ -404,17 +424,45 @@
       }
 
       let fecha = formatExcelDate(r['F.Soli']);
-      let estadoRaw = String(r['Estado'] || '').trim();
-      let motivoCanc = String(r['Motivo Cancelación'] || '').toUpperCase();
-      let estado = estadoRaw.toUpperCase();
+      let estadoRaw = String(r['Estado'] || '').trim().toUpperCase();
+      let motivoCanc = String(r['Motivo Cancelación'] || '').trim().toUpperCase();
 
-      if ((estado === 'CANCELADA' || estado === 'CANCELADO') && (motivoCanc.includes('REPROGRAMACIÓN') || motivoCanc.includes('REPROGRAMACION'))) {
+      let estado = estadoRaw;
+      if (estadoRaw === 'FINALIZADA' || estadoRaw === 'FINALIZADO') {
+        estado = 'FINALIZADO';
+      }
+      else if ((estadoRaw === 'CANCELADA' || estadoRaw === 'CANCELADO') && (motivoCanc.includes('REPROGRAMACIÓN') || motivoCanc.includes('REPROGRAMACION'))) {
         estado = 'REPROGRAMA';
+      }
+      else if (estadoRaw === 'CANCELADA' || estadoRaw === 'CANCELADO') {
+        estado = 'CANCELADO';
+      }
+      else {
+        estado = 'REGESTION';
       }
 
       let tecnico = String(r['Cuadrilla'] || 'SIN ASIGNAR').trim();
       return { distrito, fecha, estado, tecnico };
     }).filter(r => r.distrito || r.tecnico);
+  }
+
+  function populateDateSelect(){
+    const fSelect = document.getElementById('fFecha');
+    const currentVal = fSelect.value;
+    const uniqueDates = [...new Set(rawRows.map(r => r.fecha))].filter(f => f && f !== 'SIN FECHA');
+    
+    uniqueDates.sort((a,b) => {
+      const [d1, m1, y1] = a.split('/').map(Number);
+      const [d2, m2, y2] = b.split('/').map(Number);
+      return new Date(y2, m2-1, d2) - new Date(y1, m1-1, d1);
+    });
+
+    fSelect.innerHTML = '<option value="">Todas las Fechas</option>' + 
+      uniqueDates.map(f => `<option value="${f}">${f}</option>`).join('');
+
+    if (uniqueDates.includes(currentVal)) {
+      fSelect.value = currentVal;
+    }
   }
 
   function fetchFromGoogleSheets(){
@@ -424,6 +472,7 @@
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
           rawRows = parseRows(data);
+          populateDateSelect();
           document.getElementById('filtersBar').style.display = 'flex';
           document.getElementById('chartSection').style.display = 'block';
           render();
@@ -443,13 +492,16 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sheet: "BASE", rows: jsonData })
     }).then(() => {
-      console.log('Información guardada con éxito en la hoja "BASE" de Google Sheets.');
-    }).catch(err => console.error('Error al guardar en Sheets:', err));
+      console.log('Sincronización automática exitosa con la hoja "BASE".');
+    }).catch(err => console.error('Error al sincronizar automáticamente:', err));
   }
 
   document.getElementById('fBuscar').addEventListener('input', render);
+  document.getElementById('fFecha').addEventListener('change', render);
+  
   document.getElementById('btnReset').addEventListener('click', () => {
     document.getElementById('fBuscar').value = '';
+    document.getElementById('fFecha').value = '';
     render();
   });
 
@@ -458,30 +510,34 @@
     rows.forEach(r => {
       const key = keyFn(r);
       if (!key) return;
-      if (!map.has(key)) map.set(key, {key, asignados:0, finalizado:0, cancelado:0, reprograma:0, otros:0});
+      if (!map.has(key)) map.set(key, {key, asignados:0, finalizado:0, cancelado:0, reprograma:0, regestion:0});
       const g = map.get(key);
       g.asignados++;
-      if (r.estado === 'FINALIZADA' || r.estado === 'FINALIZADO') g.finalizado++;
-      else if (r.estado === 'CANCELADA' || r.estado === 'CANCELADO') g.cancelado++;
-      else if (r.estado === 'REPROGRAMA') g.reprograma++;
-      else g.otros++;
+      
+      if (r.estado === 'FINALIZADO') {
+        g.finalizado++;
+      } else if (r.estado === 'REPROGRAMA') {
+        g.reprograma++;
+      } else if (r.estado === 'CANCELADO') {
+        g.cancelado++;
+      } else {
+        g.regestion++;
+      }
     });
     return [...map.values()].map(g => {
-      const pendiente = g.asignados - g.finalizado - g.cancelado - g.reprograma;
       const efectividad = g.asignados ? g.finalizado / g.asignados : 0;
-      return {...g, pendiente, efectividad};
+      return {...g, efectividad};
     });
   }
 
   function totals(list){
-    const t = {asignados:0, finalizado:0, cancelado:0, reprograma:0, otros:0, pendiente:0};
+    const t = {asignados:0, finalizado:0, cancelado:0, reprograma:0, regestion:0};
     list.forEach(g => {
       t.asignados += g.asignados;
       t.finalizado += g.finalizado;
       t.cancelado += g.cancelado;
       t.reprograma += g.reprograma;
-      t.otros += g.otros;
-      t.pendiente += g.pendiente;
+      t.regestion += g.regestion;
     });
     t.efectividad = t.asignados ? t.finalizado / t.asignados : 0;
     return t;
@@ -492,9 +548,18 @@
   function render(){
     if (!rawRows.length) return;
     const search = document.getElementById('fBuscar').value.trim().toLowerCase();
+    const selectedDate = document.getElementById('fFecha').value;
 
-    let zonaList = aggregate(rawRows, r => r.distrito);
-    let tecList = aggregate(rawRows, r => r.tecnico);
+    // 🎯 Aplicar filtro de fecha a los registros que se mostrarán en tablas y KPIs
+    let filteredRows = rawRows;
+    if (selectedDate) {
+      filteredRows = rawRows.filter(r => r.fecha === selectedDate);
+    }
+
+    let zonaList = aggregate(filteredRows, r => r.distrito);
+    let tecList = aggregate(filteredRows, r => r.tecnico);
+    
+    // El gráfico mantiene la vista global histórica o puede reflejar la evolución
     let fechaList = aggregate(rawRows, r => r.fecha);
 
     if (search){
@@ -502,7 +567,7 @@
       tecList = tecList.filter(g => g.key.toLowerCase().includes(search));
     }
 
-    const globalTotals = totals(aggregate(rawRows, r => 'ALL'));
+    const globalTotals = totals(aggregate(filteredRows, r => 'ALL'));
     renderKpis(globalTotals);
     renderChart(fechaList);
     renderTable('zona', 'Resumen por Distrito (Zona)', zonaList);
@@ -515,7 +580,7 @@
       {label:'Finalizados', value: String(t.finalizado), subPill: pct(t.efectividad) + ' Efec.', accent:'var(--green)', accentSoft:'var(--green-soft)'},
       {label:'Reprogramados', value: String(t.reprograma), subPill: pct(t.reprograma/(t.asignados||1)) + ' Reprog.', accent:'var(--amber)', accentSoft:'var(--amber-soft)'},
       {label:'Cancelados', value: String(t.cancelado), subPill: pct(t.cancelado/(t.asignados||1)) + ' Canc.', accent:'var(--red)', accentSoft:'var(--red-soft)'},
-      {label:'Pendientes', value: String(t.pendiente), subPill: 'En Curso', accent:'var(--blue)', accentSoft:'var(--blue-soft)'},
+      {label:'Regestión', value: String(t.regestion), subPill: pct(t.regestion/(t.asignados||1)) + ' Regest.', accent:'var(--blue)', accentSoft:'var(--blue-soft)'},
       {label:'Efectividad Global', value: pct(t.efectividad), subPill: t.efectividad>=OBJETIVO?'Cumple Meta':'Bajo Meta', accent:'var(--brand-orange)', accentSoft:'var(--brand-orange-soft)'}
     ];
 
@@ -530,21 +595,25 @@
   }
 
   function renderChart(fechaList){
-    const sortedDates = [...fechaList].sort((a,b) => a.key.localeCompare(b.key));
+    const sortedDates = [...fechaList].sort((a,b) => {
+      const [d1, m1, y1] = a.key.split('/').map(Number);
+      const [d2, m2, y2] = b.key.split('/').map(Number);
+      return new Date(y1, m1-1, d1) - new Date(y2, m2-1, d2);
+    });
+
     const labels = sortedDates.map(d => d.key);
     const dataAsig = sortedDates.map(d => d.asignados);
     const dataFin = sortedDates.map(d => d.finalizado);
-    const dataEfec = sortedDates.map(d => +(d.efectividad * 100).toFixed(1));
 
     const ctx = document.getElementById('comboChart').getContext('2d');
     if (comboChartInstance) comboChartInstance.destroy();
 
     comboChartInstance = new Chart(ctx, {
+      type: 'bar',
       data: {
         labels: labels,
         datasets: [
           { 
-            type: 'bar', 
             label: 'Asignados', 
             data: dataAsig, 
             yAxisID: 'yCant', 
@@ -554,36 +623,45 @@
           },
           { 
             type: 'line', 
-            label: 'Finalizados', 
+            label: 'Finalizados / % Efectividad', 
             data: dataFin, 
             yAxisID: 'yCant', 
             borderColor: '#16A34A', 
             backgroundColor: '#16A34A', 
             borderWidth: 3, 
-            pointRadius: 5, 
+            pointRadius: 6, 
             fill: false,
             order: 1
-          },
-          { 
-            type: 'line', 
-            label: '% Efectividad', 
-            data: dataEfec, 
-            yAxisID: 'yEfec', 
-            borderColor: '#FF5A0A', 
-            backgroundColor: '#FF5A0A', 
-            borderWidth: 3, 
-            pointRadius: 5, 
-            fill: false,
-            order: 0
           }
         ]
       },
+      plugins: [ChartDataLabels],
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+          datalabels: {
+            color: '#0F172A',
+            font: { family: 'JetBrains Mono', weight: '800', size: 12 },
+            anchor: function(context) {
+              return context.dataset.type === 'line' ? 'end' : 'center';
+            },
+            align: function(context) {
+              return context.dataset.type === 'line' ? 'top' : 'center';
+            },
+            formatter: function(value, context) {
+              if (context.dataset.type === 'line') {
+                const idx = context.dataIndex;
+                const efec = sortedDates[idx].efectividad * 100;
+                return `${value} (${efec.toFixed(0)}%)`;
+              }
+              return value;
+            }
+          }
+        },
         scales: {
           yCant: { type: 'linear', position: 'left', title: { display: true, text: 'Cantidad de OTs' }, beginAtZero: true },
-          yEfec: { type: 'linear', position: 'right', min: 0, max: 100, title: { display: true, text: '% Efectividad' }, grid: { drawOnChartArea: false } }
+          yEfec: { display: false }
         }
       }
     });
@@ -611,7 +689,7 @@
               <th data-key="finalizado">FINAL.</th>
               <th data-key="reprograma">REPROG.</th>
               <th data-key="cancelado">CANC.</th>
-              <th data-key="pendiente">PEND.</th>
+              <th data-key="regestion">REGESTIÓN</th>
               <th data-key="efectividad">EFECT.</th>
               <th>ESTADO</th>
             </tr>
@@ -624,7 +702,7 @@
                 <td>${g.finalizado}</td>
                 <td>${g.reprograma}</td>
                 <td>${g.cancelado}</td>
-                <td>${g.pendiente}</td>
+                <td>${g.regestion}</td>
                 <td>${pct(g.efectividad)}</td>
                 <td>${g.efectividad >= OBJETIVO ? '<span class="pill ok">OK</span>' : `<span class="pill bad">Falta ${Math.ceil(g.asignados*OBJETIVO)-g.finalizado}</span>`}</td>
               </tr>`).join('')}
@@ -634,7 +712,7 @@
               <td>${t.finalizado}</td>
               <td>${t.reprograma}</td>
               <td>${t.cancelado}</td>
-              <td>${t.pendiente}</td>
+              <td>${t.regestion}</td>
               <td>${pct(t.efectividad)}</td>
               <td>${t.efectividad >= OBJETIVO ? '<span class="pill ok">OK</span>' : '<span class="pill bad">BAJO META</span>'}</td>
             </tr>
@@ -655,18 +733,21 @@
   document.getElementById('btnExport').addEventListener('click', () => {
     if (!rawRows.length) return;
     const wb = XLSX.utils.book_new();
-    const zonaList = aggregate(rawRows, r => r.distrito);
-    const tecList = aggregate(rawRows, r => r.tecnico);
+    const selectedDate = document.getElementById('fFecha').value;
+    let filteredRows = selectedDate ? rawRows.filter(r => r.fecha === selectedDate) : rawRows;
+    
+    const zonaList = aggregate(filteredRows, r => r.distrito);
+    const tecList = aggregate(filteredRows, r => r.tecnico);
 
     const formatData = list => list.map(g => ({
       Nombre: g.key, Asignados: g.asignados, Finalizados: g.finalizado,
-      Reprogramados: g.reprograma, Cancelados: g.cancelado, Pendientes: g.pendiente,
+      Reprogramados: g.reprograma, Cancelados: g.cancelado, Regestión: g.regestion,
       Efectividad: (g.efectividad*100).toFixed(1) + '%'
     }));
 
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(formatData(zonaList)), 'POR_DISTRITO');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(formatData(tecList)), 'POR_CUADRILLA');
-    XLSX.writeFile(wb, `Reporte_TECSYCOM_WIN_${new Date().toISOString().slice(0,10)}.xlsx`);
+    XLSX.writeFile(wb, `Reporte_TECSYCOM_WIN_${selectedDate ? selectedDate.replace(/\//g,'-') : 'HISTORICO'}.xlsx`);
   });
 
 })();
