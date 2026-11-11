@@ -287,7 +287,6 @@
   </header>
 
   <div class="filters" id="filtersBar" style="display:none;">
-    <!-- Nuevo Filtro por Fecha -->
     <div class="filter-group">
       <label for="fFecha">Fecha Solicitud</label>
       <select id="fFecha">
@@ -307,7 +306,7 @@
 
   <div id="chartSection" style="display:none;" class="chart-card">
     <h2>Evolución Diaria por Fecha de Solicitud (F.Soli)</h2>
-    <div class="sub">Columna: Asignados (con valor visible) · Línea: Finalizadas y % Efectividad (con tamaño visible destacado)</div>
+    <div class="sub">Columna: Asignados · Línea y puntos resaltados en color corporativo (#FF5A0A) solo para los días que alcanzaron o superaron la meta del 60%</div>
     <div class="chart-container">
       <canvas id="comboChart"></canvas>
     </div>
@@ -323,7 +322,7 @@
 </div>
 
 <footer>
-  Sincronización automática activa con Google Sheets (Hoja <code>BASE</code>) · Filtro de fecha activado.
+  Sincronización automática activa con Google Sheets (Hoja <code>BASE</code>) · Destacado dinámico por cumplimiento de meta.
 </footer>
 
 <script>
@@ -550,7 +549,6 @@
     const search = document.getElementById('fBuscar').value.trim().toLowerCase();
     const selectedDate = document.getElementById('fFecha').value;
 
-    // 🎯 Aplicar filtro de fecha a los registros que se mostrarán en tablas y KPIs
     let filteredRows = rawRows;
     if (selectedDate) {
       filteredRows = rawRows.filter(r => r.fecha === selectedDate);
@@ -558,8 +556,6 @@
 
     let zonaList = aggregate(filteredRows, r => r.distrito);
     let tecList = aggregate(filteredRows, r => r.tecnico);
-    
-    // El gráfico mantiene la vista global histórica o puede reflejar la evolución
     let fechaList = aggregate(rawRows, r => r.fecha);
 
     if (search){
@@ -605,6 +601,10 @@
     const dataAsig = sortedDates.map(d => d.asignados);
     const dataFin = sortedDates.map(d => d.finalizado);
 
+    // Definir colores condicionales según si alcanzaron o superaron el objetivo del 60%
+    const pointColors = sortedDates.map(d => d.efectividad >= OBJETIVO ? '#FF5A0A' : '#16A34A');
+    const pointRadiuses = sortedDates.map(d => d.efectividad >= OBJETIVO ? 7 : 5);
+
     const ctx = document.getElementById('comboChart').getContext('2d');
     if (comboChartInstance) comboChartInstance.destroy();
 
@@ -627,9 +627,11 @@
             data: dataFin, 
             yAxisID: 'yCant', 
             borderColor: '#16A34A', 
-            backgroundColor: '#16A34A', 
+            backgroundColor: pointColors,
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
+            pointRadius: pointRadiuses,
             borderWidth: 3, 
-            pointRadius: 6, 
             fill: false,
             order: 1
           }
@@ -641,7 +643,13 @@
         maintainAspectRatio: false,
         plugins: {
           datalabels: {
-            color: '#0F172A',
+            color: function(context) {
+              if (context.dataset.type === 'line') {
+                const idx = context.dataIndex;
+                return sortedDates[idx].efectividad >= OBJETIVO ? '#FF5A0A' : '#0F172A';
+              }
+              return '#0F172A';
+            },
             font: { family: 'JetBrains Mono', weight: '800', size: 12 },
             anchor: function(context) {
               return context.dataset.type === 'line' ? 'end' : 'center';
